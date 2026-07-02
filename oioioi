@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Kawaii Fast & Cozy</title>
+    <style>
+        :root {
+            --pastel-pink: #ffe5ec;
+            --pastel-blue: #d8f3dc;
+            --pastel-purple: #f0e6ff;
+            --text-color: #6c5b7b;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Comic Sans MS', 'Chalkboard SE', sans-serif;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--pastel-pink);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 100vh;
+            overflow: hidden;
+            padding: 10px 0;
+            transition: background 1s ease;
+        }
+
+        /* HUD Superior */
+        .hud {
+            display: flex;
+            justify-content: space-around;
+            width: 100%;
+            max-width: 360px;
+            background: rgba(255, 255, 255, 0.7);
+            padding: 10px;
+            border-radius: 20px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.05);
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .hud span {
+            color: #ff758f;
+        }
+
+        /* Tela do Jogo */
+        #gameCanvas {
+            background: #fbf7f5;
+            border-radius: 25px;
+            border: 6px solid #fff;
+            box-shadow: 0 12px 30px rgba(108, 91, 123, 0.15);
+            max-width: 92vw;
+            max-height: 45vh;
+        }
+
+        /* Painel de Controles */
+        .controls-layer {
+            width: 100%;
+            max-width: 380px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            margin-bottom: 5px;
+        }
+
+        /* Volante e Direção (Esquerda) */
+        .steering-box {
+            display: flex;
+            gap: 12px;
+        }
+
+        /* Pedais (Direita) */
+        .pedals-box {
+            display: flex;
+            gap: 12px;
+        }
+
+        .btn-game {
+            width: 65px;
+            height: 65px;
+            border-radius: 50%;
+            border: 3px solid #fff;
+            font-size: 22px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.08);
+            font-weight: bold;
+            color: white;
+        }
+
+        .btn-left, .btn-right { background: #b5e2fa; color: #4a90e2; }
+        .btn-brake { background: #ffb3c1; font-size: 14px; }
+        .btn-gas { background: #c1fba4; font-size: 14px; color: #52b788; }
+
+        .btn-game:active {
+            transform: scale(0.9);
+            filter: brightness(0.95);
+        }
+
+        /* Tela de Game Over Estilizada */
+        .overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255, 240, 243, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 3000;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .overlay h1 {
+            font-size: 28px;
+            color: #ff4d6d;
+            margin-bottom: 5px;
+            text-shadow: 2px 2px #fff;
+        }
+
+        .overlay p {
+            font-size: 16px;
+            color: #8c7a9b;
+            margin-bottom: 15px;
+        }
+
+        .meme-frame {
+            width: 220px;
+            height: 220px;
+            border-radius: 20px;
+            border: 6px solid #fff;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+            object-fit: cover;
+            margin-bottom: 20px;
+        }
+
+        .btn-restart {
+            background: #ff758f;
+            color: white;
+            border: none;
+            padding: 12px 35px;
+            font-size: 18px;
+            border-radius: 30px;
+            font-weight: bold;
+            box-shadow: 0 5px 15px rgba(255,117,143,0.4);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="hud">
+        <div>🛣️ <span id="distance">0.0</span> km</div>
+        <div>🪙 <span id="coins">0</span></div>
+    </div>
+
+    <canvas id="gameCanvas" width="320" height="420"></canvas>
+
+    <div class="controls-layer">
+        <!-- Volante com Setas -->
+        <div class="steering-box">
+            <div class="btn-game btn-left" id="key-left">◀</div>
+            <div class="btn-game btn-right" id="key-right">▶</div>
+        </div>
+        <!-- Pedais -->
+        <div class="pedals-box">
+            <div class="btn-game btn-brake" id="key-brake">FREIO</div>
+            <div class="btn-game btn-gas" id="key-gas">CORRER</div>
+        </div>
+    </div>
+
+    <!-- Tela de Perda / Menu -->
+    <div id="lostOverlay" class="overlay">
+        <h1 id="lostTitle">Kawaii Racer 🌸</h1>
+        <p id="lostSub">Clique para começar o passeio aconchegante!</p>
+        <img id="memeDisplay" class="meme-frame" src="1000163155.jpg" alt="Meme fofo">
+        <button class="btn-restart" id="startBtn" onclick="startGame()">Jogar</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+
+        // Lista com os nomes exatos das suas fotos enviadas
+        const memeImages = [
+            "1000163185.jpg",
+            "1000163183.jpg",
+            "1000163161.jpg",
+            "1000163155.jpg",
+            "1000163209.jpg",
+            "1000157959.jpg"
+        ];
+
+        // Estados e Variáveis do Jogo
+        let player = { x: 135, y: 330, width: 50, height: 75, targetX: 135 };
+        let obstacles = [];
+        let coinsList = [];
+        let distanceCount = 0;
+        let collectedCoins = 0;
+        let speed = 2;
+        let maxSpeed = 7;
+        let gameActive = false;
+        let frame = 0;
+
+        // Inputs de Controle
+        let moveLeft = false, moveRight = false, isGas = false, isBrake = false;
+
+        // Mapeando botões Touch do Celular
+        const setupTouch = (id, pressCallback, releaseCallback) => {
+            const btn = document.getElementById(id);
+            btn.addEventListener("touchstart", (e) => { e.preventDefault(); pressCallback(); });
+            btn.addEventListener("touchend", (e) => { e.preventDefault(); releaseCallback(); });
+            // Fallback para PC
+            btn.addEventListener("mousedown", pressCallback);
+            btn.addEventListener("mouseup", releaseCallback);
+        };
+
+        setupTouch("key-left", () => moveLeft = true, () => moveLeft = false);
+        setupTouch("key-right", () => moveRight = true, () => moveRight = false);
+        setupTouch("key-gas", () => isGas = true, () => isGas = false);
+        setupTouch("key-brake", () => isBrake = true, () => isBrake = false);
+
+        function startGame() {
+            document.getElementById("lostOverlay").style.display = "none";
+            player.x = 135; player.targetX = 135;
+            obstacles = []; coinsList = [];
+            distanceCount = 0; collectedCoins = 0; speed = 3;
+            document.getElementById("coins").innerText = "0";
+            document.getElementById("distance").innerText = "0.0";
+            gameActive = true;
+            loop();
+        }
+
+        function triggerGameOver(reasonText) {
+            gameActive = false;
+            document.getElementById("lostTitle").innerText = "You lost, what a shame!";
+            document.getElementById("lostSub").innerText = reasonText;
+            
+            // Sorteia uma das suas fotos enviadas para exibir no meio da tela
+            const randomMeme = memeImages[Math.floor(Math.random() * memeImages.length)];
+            document.getElementById("memeDisplay").src = randomMeme;
+            
+            document.getElementById("startBtn").innerText = "Tentar de Novo 🌸";
+            document.getElementById("lostOverlay").style.display = "flex";
+        }
+
+        function loop() {
+            if (!gameActive) return;
+            frame++;
+            
+            // Lógica de acelerador e freio
+            if (isGas && speed < maxSpeed) speed += 0.1;
+            else if (isBrake && speed > 1) speed -= 0.15;
+            else if (speed > 2) speed -= 0.03; // Desaceleração natural
+
+            // Incrementa quilometragem com base na velocidade
+            distanceCount += (speed * 0.001);
+            document.getElementById("distance").innerText = distanceCount.toFixed(2);
+
+            // Mudança dinâmica de cenários aconchegantes com cores pastel
+            if (distanceCount < 1.0) {
+                document.body.style.backgroundColor = "#ffe5ec"; // Sakura Pink
+            } else if (distanceCount < 2.5) {
+                document.body.style.backgroundColor = "#e8dbfc"; // Lavender Dusk
+            } else {
+                document.body.style.backgroundColor = "#fceade"; // Cozy Peach Sunset
+            }
+
+            // Movimentação suave das setas do volante
+            if (moveLeft && player.x > 30) player.x -= 4;
+            if (moveRight && player.x < 240) player.x += 4;
+
+            // Spawn Inteligente de Itens/Obstáculos
+            if (frame % 80 === 0) {
+                let laneX = [45, 135, 225][Math.floor(Math.random() * 3)];
+                let randType = Math.random();
+                
+                if (randType < 0.4) {
+                    obstacles.push({ x: laneX, y: -80, type: 'cone', w: 40, h: 40 });
+                } else if (randType < 0.7) {
+                    obstacles.push({ x: laneX, y: -80, type: 'carro', w: 48, h: 75 });
+                } else {
+                    obstacles.push({ x: laneX, y: -80, type: 'policia', w: 48, h: 75 });
+                }
+            }
+
+            // Spawn das Moedas estilo Sonic (Rings)
+            if (frame % 50 === 0) {
+                let laneX = [55, 145, 235][Math.floor(Math.random() * 3)];
+                coinsList.push({ x: laneX, y: -40, w: 20, h: 20 });
+            }
+
+            // Atualizar e Mover as coisas
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                obstacles[i].y += speed;
+                
+                // Colisão simples
+                if (player.x < obstacles[i].x + obstacles[i].w &&
+                    player.x + player.width > obstacles[i].x &&
+                    player.y < obstacles[i].y + obstacles[i].h &&
+                    player.y + player.height > obstacles[i].y) {
+                    
+                    if (obstacles[i].type === 'policia') {
+                        triggerGameOver("Você bateu na polícia, levou uma multa de trânsito!");
+                    } else {
+                        triggerGameOver("Você colidiu no meio do caminho!");
+                    }
+                    return;
+                }
+                if (obstacles[i].y > canvas.height) obstacles.splice(i, 1);
+            }
+
+            // Lógica das Moedas
+            for (let i = coinsList.length - 1; i >= 0; i--) {
+                coinsList[i].y += speed;
+                if (player.x < coinsList[i].x + coinsList[i].w &&
+                    player.x + player.width > coinsList[i].x &&
+                    player.y < coinsList[i].y + coinsList[i].h &&
+                    player.y + player.height > coinsList[i].y) {
+                    
+                    collectedCoins++;
+                    document.getElementById("coins").innerText = collectedCoins;
+                    coinsList.splice(i, 1);
+                    continue;
+                }
+                if (coinsList[i].y > canvas.height) coinsList.splice(i, 1);
+            }
+
+            // --- DESENHAR NA TELA ---
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Desenhar Estrada Kawaii
+            ctx.fillStyle = "#f2ece9";
+            ctx.fillRect(20, 0, 280, canvas.height);
+            
+            // Linhas tracejadas da pista fofa
+            ctx.strokeStyle = "#fff";
+            ctx.lineWidth = 4;
+            ctx.setLineDash([15, 15]);
+            ctx.beginPath();
+            ctx.moveTo(110, 0); ctx.lineTo(110, canvas.height);
+            ctx.moveTo(210, 0); ctx.lineTo(210, canvas.height);
+            ctx.stroke();
+
+            // Desenhar as moedas do Sonic (Círculos Dourados Brilhantes)
+            coinsList.forEach(c => {
+                ctx.fillStyle = "#ffd166";
+                ctx.strokeStyle = "#f7a072";
+                ctx.lineWidth = 3;
+                ctx.setLineDash([]);
+                ctx.beginPath();
+                ctx.arc(c.x + 10, c.y + 10, 10, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+            });
+
+            // Desenhar Obstáculos
+            obstacles.forEach(o => {
+                ctx.setLineDash([]);
+                if (o.type === 'cone') {
+                    ctx.fillStyle = "#ffb703"; // Cone Laranja Pastel
+                    ctx.beginPath();
+                    ctx.moveTo(o.x + 20, o.y);
+                    ctx.lineTo(o.x, o.y + 40);
+                    ctx.lineTo(o.x + 40, o.y + 40);
+                    ctx.fill();
+                } else if (o.type === 'carro') {
+                    ctx.fillStyle = "#bbf2f6"; // Carro fofo menta
+                    ctx.beginPath(); ctx.roundRect(o.x, o.y, o.w, o.h, 12); ctx.fill();
+                } else if (o.type === 'policia') {
+                    ctx.fillStyle = "#6c5b7b"; // Carro de Polícia
+                    ctx.beginPath(); ctx.roundRect(o.x, o.y, o.w, o.h, 12); ctx.fill();
+                    // Giroflex Piscando
+                    ctx.fillStyle = (frame % 20 < 10) ? "#ff4d6d" : "#4a90e2";
+                    ctx.fillRect(o.x + 14, o.y + 30, 20, 8);
+                }
+            });
+
+            // Desenhar o Carro do Jogador (Rosa Pastel Chiclete)
+            ctx.fillStyle = "#ff8fa3";
+            ctx.setLineDash([]);
+            ctx.beginPath();
+            ctx.roundRect(player.x, player.y, player.width, player.height, 14);
+            ctx.fill();
+            // Detalhes fofos (Janela)
+            ctx.fillStyle = "#fff";
+            ctx.fillRect(player.x + 8, player.y + 20, 34, 15);
+
+            requestAnimationFrame(loop);
+        }
+    </script>
+</body>
+</html>
